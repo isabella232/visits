@@ -651,8 +651,10 @@ App-specific commands.
 def download_csv():
     data.download_csv()
 
+@task
 def parse_csv():
     data.parse_csv()
 
+@task
 def write_aggregates():
     data.write_aggregates()
