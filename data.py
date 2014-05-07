@@ -41,10 +41,14 @@ def write_aggregates():
         'message_2011',
         'message_2012',
         'message_2013',
-        'message_2014'
+        'message_2014',
+        '2012_obama_vote_share',
+        '2012_obama_vote_pct',
+        '2008_obama_vote_share',
+        '2008_obama_vote_pct'
     ]
 
-    with open('data/visits.csv', 'rb') as readfile:
+    with open('data/visits-annotated.csv', 'rb') as readfile:
         visits = list(csv.DictReader(readfile))
 
     counties = Set([])
@@ -57,7 +61,7 @@ def write_aggregates():
 
         counties.add(json.dumps(county_json))
 
-    with open('data/county_aggregates.csv', 'wb') as writefile:
+    with open('data/county-aggregates.csv', 'wb') as writefile:
         csvwriter = csv.DictWriter(writefile, fieldnames=fieldnames)
         csvwriter.writeheader()
         for county in counties:
@@ -91,12 +95,24 @@ def write_aggregates():
             payload['message_2012'] = 0
             payload['message_2013'] = 0
             payload['message_2014'] = 0
+            payload['2008_obama_vote_share'] = 0.0
+            payload['2008_obama_vote_pct'] = 0.0
+            payload['2012_obama_vote_share'] = 0.0
+            payload['2012_obama_vote_pct'] = 0.0
 
             for visit in visits:
                 if visit['combined_fips'].zfill(5) == payload['combined_fips'].zfill(5):
                     payload['total_visits'] += 1
 
-                    visit['date'] = parse(visit['date'])
+                    payload['2008_obama_vote_share'] = visit['2008_obama_vote_share']
+                    payload['2008_obama_vote_pct'] = visit['2008_obama_vote_pct']
+                    payload['2012_obama_vote_share'] = visit['2012_obama_vote_share']
+                    payload['2012_obama_vote_pct'] = visit['2012_obama_vote_pct']
+
+                    try:
+                        visit['date'] = parse(visit['date'])
+                    except AttributeError:
+                        pass
 
                     if visit['visit_type'].lower() == "fundraiser":
                         payload['total_fundraising_visits'] += 1
@@ -119,43 +135,76 @@ def write_visit_file():
         for visit in Visit.objects.all():
             csvwriter.writerow(visit.to_dict())
 
-def parse_csv():
+def write_annotations():
     with open('data/visits.csv', 'rb') as readfile:
         visits = list(csv.DictReader(readfile))
 
     from django.contrib.gis.gdal import DataSource
-    ds = DataSource('www/assets/shp/elpo12p010g.shp')
-    layer = ds[0]
 
-    fieldnames = ['date', 'location', 'city', 'state', 'county', '2012_obama_vote_share', '2012_obama_vote_pct', 'state_fips', 'county_fips', 'combined_fips', 'visit_type', 'description', 'link']
+    ds2012 = DataSource('www/assets/shp/elpo12p010g.shp')
+    layer2012 = ds2012[0]
 
-    with open('data/visits-2012annotated.csv', 'wb') as writefile:
+    ds2008 = DataSource('www/assets/shp/elpo08p020.shp')
+    layer2008 = ds2008[0]
+
+    fieldnames = ['date', 'location', 'city', 'state', 'county', '2012_obama_vote_share', '2012_obama_vote_pct', '2008_obama_vote_share', '2008_obama_vote_pct', 'state_fips', 'county_fips', 'combined_fips', 'visit_type', 'description', 'link']
+
+    with open('data/visits-annotated.csv', 'wb') as writefile:
         csvwriter = csv.DictWriter(writefile, fieldnames=fieldnames)
         csvwriter.writeheader()
-        for visit in visits:
+        for i, visit in enumerate(visits):
+
             unknown = True
-            for county in layer:
+
+            print "START %s" % i
+
+            for county in layer2008:
+                if visit['combined_fips'].zfill(5) == county['FIPS'].as_string():
+                    visit['2008_obama_vote_share'] = float(county['PERCENT_DE'].as_string()) - float(county['PERCENT_RE'].as_string())
+                    visit['2008_obama_vote_pct'] = float(county['PERCENT_DE'].as_string())
+                    print "\tGot 2008 fips."
+                    unknown = False
+                    break
+
+                elif (visit['state'].lower() == county['STATE'].as_string().lower()) and (visit['county'].lower() == county['COUNTY'].as_string().lower()):
+                    visit['2008_obama_vote_share'] = float(county['PERCENT_DE'].as_string()) - float(county['PERCENT_RE'].as_string())
+                    visit['2008_obama_vote_pct'] = float(county['PERCENT_DE'].as_string())
+                    print "\tGot 2008 state/county name."
+                    unknown = False
+                    break
+
+            if unknown:
+                print '\t!! Failed to lookup 2008 results for fips: %s' % visit['combined_fips'].zfill(5)
+
+            unknown = True
+
+            for county in layer2012:
                 if visit['combined_fips'].zfill(5) == county['FIPS'].as_string():
                     visit['2012_obama_vote_share'] = float(county['PCT_OBM'].as_string()) - float(county['PCT_ROM'].as_string())
                     visit['2012_obama_vote_pct'] = float(county['PCT_OBM'].as_string())
-                    csvwriter.writerow(visit)
+                    print "\tGot 2012 fips."
                     unknown = False
                     break
+
                 elif (visit['state'].lower() == county['STATE'].as_string().lower()) and (visit['county'].lower() == county['COUNTY'].as_string().lower()):
                     visit['2012_obama_vote_share'] = float(county['PCT_OBM'].as_string()) - float(county['PCT_ROM'].as_string())
                     visit['2012_obama_vote_pct'] = float(county['PCT_OBM'].as_string())
-                    csvwriter.writerow(visit)
+                    print "\tGot 2012 state/county name."
                     unknown = False
                     break
+
             if unknown:
-                print visit['combined_fips'].zfill(5)
+                print '\t!! Failed to lookup 2012 results for fips: %s' % visit['combined_fips'].zfill(5)
+
+            print "FINISH %s" % i
+            csvwriter.writerow(visit)
 
 def download_csv():
     doc = {
         "key": "0AgtV5am-X0b8dG9qS21LQUNMSDNJakRFNkpvbFBGbVE",
         "file_name": "visits",
         "file_format": "csv",
-        "gid": "7"
+        "gid": "8"
     }
     g = GoogleDoc(**doc)
     g.get_auth()

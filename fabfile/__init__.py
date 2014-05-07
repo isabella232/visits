@@ -652,8 +652,8 @@ def download_csv():
     data.download_csv()
 
 @task
-def parse_csv():
-    data.parse_csv()
+def write_annotations():
+    data.write_annotations()
 
 @task
 def write_aggregates():
