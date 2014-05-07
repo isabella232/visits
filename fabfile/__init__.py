@@ -10,6 +10,7 @@ from jinja2 import Template
 
 import app
 import app_config
+import data
 from etc import github
 from etc.gdocs import GoogleDoc
 
@@ -17,7 +18,7 @@ from etc.gdocs import GoogleDoc
 import assets
 import utils
 
-NPM_INSTALL_COMMAND = 'npm install less universal-jst -g --prefix node_modules' 
+NPM_INSTALL_COMMAND = 'npm install less universal-jst -g --prefix node_modules'
 
 """
 Base configuration
@@ -324,7 +325,7 @@ def install_requirements():
     require('settings', provided_by=[production, staging])
 
     run('%(SERVER_VIRTUALENV_PATH)s/bin/pip install -U -r %(SERVER_REPOSITORY_PATH)s/requirements.txt' % app_config.__dict__)
-    run('cd %s; %s' % (app_config.SERVER_REPOSITORY_PATH, NPM_INSTALL_PATH)) 
+    run('cd %s; %s' % (app_config.SERVER_REPOSITORY_PATH, NPM_INSTALL_PATH))
 
 @task
 def install_crontab():
@@ -641,3 +642,17 @@ def app_template_bootstrap(github_username='nprapps', project_name=None, reposit
     local('git push -u origin master')
 
     bootstrap()
+
+"""
+App-specific commands.
+"""
+
+@task
+def download_csv():
+    data.download_csv()
+
+def parse_csv():
+    data.parse_csv()
+
+def write_aggregates():
+    data.write_aggregates()
