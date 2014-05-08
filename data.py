@@ -5,6 +5,7 @@ import json
 from sets import Set
 
 from dateutil.parser import *
+from django.contrib.gis.gdal import DataSource
 
 from etc.gdocs import GoogleDoc
 
@@ -138,8 +139,6 @@ def write_visit_file():
 def write_annotations():
     with open('data/visits.csv', 'rb') as readfile:
         visits = list(csv.DictReader(readfile))
-
-    from django.contrib.gis.gdal import DataSource
 
     ds2012 = DataSource('www/assets/shp/elpo12p010g.shp')
     layer2012 = ds2012[0]
